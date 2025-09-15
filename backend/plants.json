@@ -1,0 +1,14 @@
+{
+  "snake plant": {
+    "water": "Every 2-3 weeks. Allow soil to dry.",
+    "sunlight": "Low to bright indirect light."
+  },
+  "aloe vera": {
+    "water": "Every 3 weeks, less in winter.",
+    "sunlight": "Bright, indirect sunlight."
+  },
+  "money plant": {
+    "water": "Once a week.",
+    "sunlight": "Indirect sunlight."
+  }
+}
