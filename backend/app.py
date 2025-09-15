@@ -1,61 +1,42 @@
+import os
+import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
-import base64
-import json
-import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Load plant care data
-with open("plants.json", "r") as f:
-    plant_data = json.load(f)
-
-PLANT_ID_API_KEY = "YOUR_API_KEY_HERE"  # 🔑 Replace with your key
-PLANT_ID_URL = "https://api.plant.id/v3/identification"
+PLANTNET_API_URL = "https://my-api.plantnet.org/v2/identify/all"
+PLANTNET_API_KEY = os.getenv("PLANTNET_API_KEY")  # store in .env file
 
 @app.route("/identify", methods=["POST"])
 def identify():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    if "image" not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
 
-    file = request.files["file"]
-
-    # Convert image to base64
-    img_base64 = base64.b64encode(file.read()).decode("utf-8")
-
-    # Prepare request payload
-    payload = {
-        "images": [img_base64],
-        "similar_images": True
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "Api-Key": PLANT_ID_API_KEY
-    }
-
-    # Call Plant.id API
-    response = requests.post(PLANT_ID_URL, headers=headers, json=payload)
-    result = response.json()
+    image = request.files["image"]
+    files = {"images": (image.filename, image.stream, image.content_type)}
+    headers = {"Api-Key": PLANTNET_API_KEY}
+    params = {"organs": ["leaf"]}
 
     try:
-        plant_name = result["result"]["classification"]["suggestions"][0]["name"]
-    except:
-        return jsonify({"error": "Could not identify plant"}), 500
+        response = requests.post(PLANTNET_API_URL, files=files, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
 
-    # Match with care data (fallback if not found)
-    care_info = plant_data.get(plant_name, {
-        "watering": "General: Water moderately",
-        "sunlight": "General: Indirect light preferred",
-        "tips": "No specific info available"
-    })
-
-    return jsonify({
-        "plant": plant_name,
-        "care": care_info
-    })
+        if "results" in data and data["results"]:
+            plant = data["results"][0]["species"]
+            return jsonify({
+                "plant_name": plant.get("scientificNameWithoutAuthor", "N/A"),
+                "common_name": plant.get("commonName", "N/A"),
+                "family": plant.get("family", "N/A"),
+                "genus": plant.get("genus", "N/A"),
+                "image": plant.get("imageUrl", "")
+            })
+        else:
+            return jsonify({"error": "No plant identified"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
